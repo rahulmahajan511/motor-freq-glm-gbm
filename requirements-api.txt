@@ -1,0 +1,9 @@
+numpy
+pandas
+scikit-learn
+glum
+lightgbm
+joblib
+fastapi
+uvicorn
+pydantic
