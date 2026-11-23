@@ -4,10 +4,10 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_poisson_deviance
 
 from motorfreq.data import FEATURES, get_splits
 from motorfreq.features import build_glm, choose_bases
+from motorfreq.metrics import evaluate, lift_table
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / 'models' / 'glm.joblib'
 
@@ -27,14 +27,20 @@ def _summary() -> None:
     model = fit_glm(train)
     joblib.dump(model, MODEL_PATH)
 
-    null = train['ClaimNb'].sum() / train['Exposure'].sum()
+    null = train['ClaimNb'].sum() / train['Exposure'].sum()  # train rate for both
     for name, part in (('train', train), ('valid', valid)):
         pred = model.predict(part[FEATURES])
-        w = part['Exposure']
-        dev = mean_poisson_deviance(part['Freq'], pred, sample_weight=w)
-        dev0 = mean_poisson_deviance(part['Freq'], np.full(len(part), null), sample_weight=w)
-        ae = part['ClaimNb'].sum() / (pred * w).sum()
-        print(f'{name:<6} null dev {dev0:.4f}  glm dev {dev:.4f}  gain {100 * (1 - dev / dev0):.2f}%  A/E {ae:.4f}')
+        m = evaluate(part['ClaimNb'], part['Exposure'], pred, null_rate=null)
+        print(
+            f"{name:<6} null dev {m['null_dev']:.4f}  glm dev {m['dev']:.4f}  "
+            f"gain {100 * m['gain']:.2f}%  A/E {m['ae']:.4f}  Gini {m['gini']:.4f}"
+        )
+        if name == 'valid':
+            vpred = pred
+
+    print('valid decile lift (equal exposure, sorted by predicted frequency):')
+    print(lift_table(valid['ClaimNb'], vpred, valid['Exposure']).to_string(
+        float_format=lambda v: f'{v:,.4f}'))
 
     g = model.named_steps['glm']
     names = model.named_steps['pre'].get_feature_names_out()
