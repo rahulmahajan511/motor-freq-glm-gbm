@@ -43,7 +43,8 @@ def prepare(df: pd.DataFrame, levels: dict) -> pd.DataFrame:
     Unseen levels become NaN (= missing), NOT the base level as in the GLM."""
     x = clean_features(df[FEATURES]).copy()
     for c in GBM_CATS:
-        x[c] = x[c].astype(str).astype(pd.CategoricalDtype(levels[c]))
+        s = x[c].astype(str)
+        x[c] = pd.Categorical(s.where(s.isin(levels[c])), categories=levels[c])
     return x[FEATURES]
 
 
